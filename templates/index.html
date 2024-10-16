@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Корзина</title>
+    <style>
+        .container {
+            display: flex;
+            justify-content: space-between;
+        }
+        .table-container {
+            width: 45%;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+    <script>
+        async function sendData(url, data) {
+            try {
+                console.log(`Sending data to ${url}:`, data); // Добавляем вывод данных в консоль
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    alert(`Error: ${JSON.stringify(errorData)}`);
+                } else {
+                    location.reload();
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        function addUser(event) {
+            event.preventDefault();
+            const name = document.querySelector('input[name="user_name"]').value;
+            sendData('/users/add', { name });
+        }
+
+        function deleteUser(userId) {
+            sendData(`/users/delete/${userId}`, {});
+        }
+
+        function addProduct(event) {
+            event.preventDefault();
+            const name = document.querySelector('input[name="product_name"]').value;
+            sendData('/products/add', { name });
+        }
+
+        function deleteProduct(productId) {
+            sendData(`/products/delete/${productId}`, {});
+        }
+
+        function addToCart(event) {
+            event.preventDefault();
+            const userId = document.querySelector('select[name="user_id"]').value;
+            const productId = document.querySelector('select[name="product_id"]').value;
+            const quantity = document.querySelector('input[name="quantity"]').value;
+            sendData('/cart/add', { user_id: userId, product_id: productId, quantity: quantity });
+        }
+
+        function removeFromCart(cartItemId) {
+            sendData(`/cart/remove/${cartItemId}`, {});
+        }
+
+        function toggleEdit(cartItemId) {
+            const quantityInput = document.querySelector(`input[name="quantity_${cartItemId}"]`);
+            const editButton = document.querySelector(`button[name="edit_${cartItemId}"]`);
+            if (quantityInput.disabled) {
+                quantityInput.disabled = false;
+                editButton.textContent = "Принять изменения";
+            } else {
+                const quantity = parseInt(quantityInput.value, 10); // Преобразование в целое число
+                sendData(`/cart/update/${cartItemId}`, { quantity: quantity });
+                quantityInput.disabled = true;
+                editButton.textContent = "Изменить";
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Корзина</h1>
+    <div class="container">
+        <div class="table-container">
+            <h2>Пользователи</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Имя</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>{{ user.name }}</td>
+                            <td><button onclick="deleteUser({{ user.id }})">Удалить</button></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <h2>Добавить пользователя</h2>
+            <form onsubmit="addUser(event)">
+                <input type="text" name="user_name" placeholder="Имя пользователя">
+                <button type="submit">Добавить</button>
+            </form>
+        </div>
+        <div class="table-container">
+            <h2>Товары</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Название</th>
+                        <th>Действия</th>
+                    </tr>
+                    </thead>
+                <tbody>
+                    {% for product in products %}
+                        <tr>
+                            <td>{{ product.id }}</td>
+                            <td>{{ product.name }}</td>
+                            <td><button onclick="deleteProduct({{ product.id }})">Удалить</button></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <h2>Добавить товар</h2>
+            <form onsubmit="addProduct(event)">
+                <input type="text" name="product_name" placeholder="Название товара">
+                <button type="submit">Добавить</button>
+            </form>
+        </div>
+    </div>
+
+    <h2>Добавить товар в корзину</h2>
+    <form onsubmit="addToCart(event)">
+        <select name="user_id">
+            {% for user in users %}
+                <option value="{{ user.id }}">{{ user.name }}</option>
+            {% endfor %}
+        </select>
+        <select name="product_id">
+            {% for product in products %}
+                <option value="{{ product.id }}">{{ product.name }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" name="quantity" placeholder="Количество">
+        <button type="submit">Добавить</button>
+    </form>
+
+    <h2>Содержимое корзины</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Пользователь</th>
+                <th>Товар</th>
+                <th>Количество</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in cart_details %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.user_name }}</td>
+                    <td>{{ item.product_name }}</td>
+                    <td><input type="number" name="quantity_{{ item.id }}" value="{{ item.quantity }}" disabled></td>
+                    <td>
+                        <button name="edit_{{ item.id }}" onclick="toggleEdit({{ item.id }})">Изменить</button>
+                        <button onclick="removeFromCart({{ item.id }})">Удалить</button>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
